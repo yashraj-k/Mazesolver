@@ -1,136 +1,102 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
+import tkinter as tk
+from collections import deque
 
-struct MazeSolver {
-    int** maze;
-    int rows;
-    int cols;
-    bool** visited;
-};
+class MazeSolver:
+    def __init__(self, maze):
+        self.maze = maze
+        self.rows = len(maze)
+        self.cols = len(maze[0])
+        self.visited = [[False] * self.cols for _ in range(self.rows)]
 
-bool isValid(struct MazeSolver* solver, int row, int col) {
-    return 0 <= row && row < solver->rows && 0 <= col && col < solver->cols &&
-           !solver->visited[row][col] && solver->maze[row][col] == 0;
-}
+    def is_valid(self, row, col):
+        return 0 <= row < self.rows and 0 <= col < self.cols and not self.visited[row][col] and self.maze[row][col] == 0
 
-int* solve(struct MazeSolver* solver, int* start, int* end, int* pathLength) {
-    int* queue = (int*)malloc(sizeof(int) * (solver->rows * solver->cols * 3)); // Added space for row and column information
-    int* path = (int*)malloc(sizeof(int) * (solver->rows * solver->cols * 3)); // Added space for row and column information
+    def solve(self, start, end):
+        queue = deque([(start, [])])
 
-    int queueFront = 0, queueRear = 0;
+        while queue:
+            current, path = queue.popleft()
+            row, col = current
+            self.visited[row][col] = True
 
-    queue[queueRear++] = start[0]; // Enqueue the row of the start
-    queue[queueRear++] = start[1]; // Enqueue the column of the start
+            if current == end:
+                return path + [current]
 
-    while (queueFront < queueRear) {
-        int currentRow = queue[queueFront++];
-        int currentCol = queue[queueFront++];
-        solver->visited[currentRow][currentCol] = true;
+            neighbors = [(row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)]
 
-        if (currentRow == end[0] && currentCol == end[1]) {
-            int pathIndex = 0;
-            int current = queueFront - 2; // Adjust for the queue layout
-            while (current != -2) {
-                path[pathIndex++] = current;
-                current = queue[current];
-            }
-            *pathLength = pathIndex / 3;
-            return path;
-        }
+            for neighbor in neighbors:
+                n_row, n_col = neighbor
+                if self.is_valid(n_row, n_col):
+                    queue.append(((n_row, n_col), path + [current]))
 
-        int neighbors[4][2] = {{currentRow - 1, currentCol},
-                               {currentRow + 1, currentCol},
-                               {currentRow, currentCol - 1},
-                               {currentRow, currentCol + 1}};
+        return []
 
-        for (int i = 0; i < 4; i++) {
-            int nRow = neighbors[i][0];
-            int nCol = neighbors[i][1];
-            if (isValid(solver, nRow, nCol)) {
-                queue[queueRear++] = nRow;
-                queue[queueRear++] = nCol;
-                queue[queueRear++] = queueFront - 2; // Store the previous element index
-            }
-        }
-    }
+def highlight_path(maze, path):
+    highlighted_maze = [list(row) for row in maze]
+    for (row, col) in path:
+        highlighted_maze[row][col] = '*'
 
-    *pathLength = 0;
-    return NULL;
-}
+    return highlighted_maze
 
-int main() {
-    int rows, cols;
-    printf("Enter the number of rows and columns: ");
-    scanf("%d %d", &rows, &cols);
+class MazeSolverApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Maze Solver")
 
-    int** maze = (int**)malloc(sizeof(int*) * rows);
-    for (int i = 0; i < rows; i++) {
-        maze[i] = (int*)malloc(sizeof(int) * cols);
-    }
+        self.create_widgets()
 
-    printf("Enter the maze (0 for open path, 1 for walls):\n");
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            scanf("%d", &maze[i][j]);
-        }
-    }
+    def create_widgets(self):
+        self.maze_label = tk.Label(self.root, text="Enter the maze (0 for open path, 1 for walls):")
+        self.maze_label.pack()
 
-    struct MazeSolver solver;
-    solver.maze = maze;
-    solver.rows = rows;
-    solver.cols = cols;
+        self.maze_text = tk.Text(self.root, height=10, width=40)
+        self.maze_text.pack()
 
-    int* path;
-    int pathLength = 0;
-    int start[2], end[2];
+        self.start_label = tk.Label(self.root, text="Enter the start point (row col):")
+        self.start_label.pack()
 
-    printf("Enter the start point (row col): ");
-    scanf("%d %d", &start[0], &start[1]);
+        self.start_entry = tk.Entry(self.root)
+        self.start_entry.pack()
 
-    printf("Enter the end point (row col): ");
-    scanf("%d %d", &end[0], &end[1]);
+        self.end_label = tk.Label(self.root, text="Enter the end point (row col):")
+        self.end_label.pack()
 
-    solver.visited = (bool**)malloc(sizeof(bool*) * rows);
-    for (int i = 0; i < rows; i++) {
-        solver.visited[i] = (bool*)calloc(cols, sizeof(bool));
-    }
+        self.end_entry = tk.Entry(self.root)
+        self.end_entry.pack()
 
-    path = solve(&solver, start, end, &pathLength);
+        self.solve_button = tk.Button(self.root, text="Solve Maze", command=self.solve_maze)
+        self.solve_button.pack()
 
-    if (path != NULL) {
-        printf("Shortest Path found!\n");
-        for (int i = pathLength - 1; i >= 0; i--) {
-            int row = path[i * 3]; // Extract row information
-            int col = path[i * 3 + 1]; // Extract column information
-            printf("(%d, %d) ", row, col);
-            maze[row][col] = -1; // Mark the path with -1
-        }
-        printf("\n");
+        self.result_label = tk.Label(self.root, text="Result:")
+        self.result_label.pack()
 
-        printf("Maze with Path:\n");
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                if (maze[i][j] == -1) {
-                    printf("* "); // Print asterisk for the path
-                } else {
-                    printf("%d ", maze[i][j]);
-                }
-            }
-            printf("\n");
-        }
-    } else {
-        printf("No path found.\n");
-    }
+        self.result_text = tk.Text(self.root, height=10, width=40)
+        self.result_text.pack()
 
-    for (int i = 0; i < rows; i++) {
-        free(maze[i]);
-        free(solver.visited[i]);
-    }
-    free(maze);
-    free(solver.visited);
-    free(path); // Free allocated path
+    def solve_maze(self):
+        maze_input = self.maze_text.get(1.0, tk.END)
+        start_input = self.start_entry.get()
+        end_input = self.end_entry.get()
 
-    return 0;
-}
+        maze = [list(map(int, row.split())) for row in maze_input.split('\n') if row.strip()]
+        start = tuple(map(int, start_input.split()))
+        end = tuple(map(int, end_input.split()))
 
+        solver = MazeSolver(maze)
+        path = solver.solve(start, end)
+
+        if path:
+            result = "Shortest Path found!\n"
+            highlighted_maze = highlight_path(maze, path)
+            for row in highlighted_maze:
+                result += ' '.join(map(str, row)) + '\n'
+        else:
+            result = "No path found."
+
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.insert(tk.END, result)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MazeSolverApp(root)
+    root.mainloop()
